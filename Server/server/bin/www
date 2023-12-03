@@ -1,0 +1,102 @@
+var debug = require('debug')('server:server');
+var http = require('http');
+const process = require('process');
+
+//클러스터를 통해서 멀티스레딩을 지원합니다.
+const cluster = require('cluster');
+const os = require('os');
+
+console.log("시작");
+var app = require('../app');
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+
+//마스터 프로세스인가?
+if (cluster.isMaster){
+  //지원 가능한 만큼 스레드를 생성합니다.
+  os.cpus().forEach(function(cpu){
+      cluster.fork();
+  });
+  //워커가 종료되었을때 처리
+  cluster.on('exit', function(worker, code, signal){
+      console.log('worker exit : ' + worker.id);
+  })
+}else{
+  //워커 스레드일 경우
+  
+  /**
+   * Create HTTP server.
+   */
+  var server = http.createServer(app);
+
+  /**
+   * Listen on provided port, on all network interfaces.
+   */
+
+  server.listen(port);
+  server.on('error', onError);
+  server.on('listening', onListening);
+}
+
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
